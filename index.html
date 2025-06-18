@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Base64 File Encoder with Web Worker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .top-controls, .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .drop-zone {
+      border: 2px dashed #aaa;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      color: #555;
+      background-color: #fafafa;
+      margin-bottom: 10px;
+    }
+    .drop-zone.dragover {
+      border-color: #333;
+      background-color: #f0f0f0;
+    }
+    textarea {
+      width: calc(100% - 120px);
+      height: 300px;
+      font-family: monospace;
+    }
+    button {
+      height: 40px;
+      padding: 0 20px;
+      cursor: pointer;
+    }
+    #progressBar {
+      width: 100%;
+      height: 20px;
+      background-color: #eee;
+      margin-bottom: 10px;
+    }
+    #progressBar div {
+      height: 100%;
+      width: 0%;
+      background-color: #4caf50;
+      transition: width 0.2s;
+    }
+  </style>
+</head>
+<body>
+  <h2>Convert File to Base64 (with Web Worker)</h2>
+
+  <div class="drop-zone" id="dropZone">Drag & drop a file here or use the input below</div>
+
+  <div class="top-controls">
+    <input type="file" id="fileInput" />
+    <button id="convertBtn">Convert</button>
+  </div>
+
+  <div id="progressBar"><div></div></div>
+
+  <div class="controls">
+    <textarea id="output" placeholder="Base64 output will appear here..." readonly></textarea>
+    <button id="copyBtn">Copy</button>
+  </div>
+
+  <script>
+    let currentFile = null;
+    const fileInput = document.getElementById('fileInput');
+    const convertBtn = document.getElementById('convertBtn');
+    const output = document.getElementById('output');
+    const copyBtn = document.getElementById('copyBtn');
+    const dropZone = document.getElementById('dropZone');
+    const progressBar = document.getElementById('progressBar').firstElementChild;
+
+    const worker = new Worker('worker.js');
+
+    worker.onmessage = (e) => {
+      const { type, data } = e.data;
+      if (type === 'progress') {
+        progressBar.style.width = data + '%';
+      } else if (type === 'result') {
+        output.value = data;
+        progressBar.style.width = '100%';
+      } else if (type === 'error') {
+        alert('Error: ' + data);
+      }
+    };
+
+    convertBtn.addEventListener('click', () => {
+      if (!currentFile) {
+        alert("Please select or drop a file first.");
+        return;
+      }
+
+      progressBar.style.width = '0%';
+      output.value = '';
+      worker.postMessage({ file: currentFile });
+    });
+
+    copyBtn.addEventListener('click', () => {
+      output.select();
+      document.execCommand('copy');
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy'), 2000);
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        currentFile = e.dataTransfer.files[0];
+        fileInput.value = '';
+        dropZone.textContent = `File ready: ${currentFile.name}`;
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        currentFile = fileInput.files[0];
+        dropZone.textContent = `File ready: ${currentFile.name}`;
+      }
+    });
+  </script>
+</body>
+</html>
