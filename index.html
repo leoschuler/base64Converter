@@ -2,70 +2,395 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Base64 File Encoder with Web Worker</title>
+  <title>Base64 Converter</title>
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1726;
+      --surface: #16203a;
+      --surface-strong: #1f2b4d;
+      --border: rgba(148, 163, 184, 0.18);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #3dd9b0;
+      --accent-strong: #22c55e;
+      --danger: #f87171;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+      font-family: Inter, system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      min-height: 100%;
+      margin: 0;
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 35%),
+                  radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.12), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
+      padding: 24px;
     }
-    .top-controls, .controls {
+
+    .app-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      gap: 24px;
+    }
+
+    .hero {
       display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2rem, 3vw, 2.6rem);
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 12px 0 0;
+      max-width: 680px;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(15, 23, 38, 0.96), rgba(24, 37, 61, 0.96));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      min-height: 520px;
+    }
+
+    .card-title {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
+      margin: 0 0 18px;
+      gap: 12px;
     }
+
+    .card-title h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.01em;
+    }
+
+    .card-title .subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .file-panel {
+      flex: 1;
+      display: grid;
+      gap: 18px;
+    }
+
     .drop-zone {
-      border: 2px dashed #aaa;
-      border-radius: 8px;
-      padding: 20px;
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 20px;
+      padding: 36px 24px;
       text-align: center;
-      color: #555;
-      background-color: #fafafa;
-      margin-bottom: 10px;
+      color: var(--muted);
+      transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
     }
+
     .drop-zone.dragover {
-      border-color: #333;
-      background-color: #f0f0f0;
+      border-color: rgba(59, 130, 246, 0.75);
+      background: rgba(59, 130, 246, 0.12);
+      transform: translateY(-1px);
     }
-    textarea {
-      width: calc(100% - 120px);
-      height: 300px;
-      font-family: monospace;
+
+    .drop-zone strong {
+      color: #fff;
+      display: block;
+      font-size: 1.02rem;
     }
-    button {
-      height: 40px;
-      padding: 0 20px;
+
+    .file-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .file-meta span {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .file-meta strong {
+      color: #fff;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .actions input[type=file] {
+      flex: 1;
+      min-width: 0;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
       cursor: pointer;
     }
-    #progressBar {
-      width: 100%;
-      height: 20px;
-      background-color: #eee;
-      margin-bottom: 10px;
+
+    .actions button,
+    .copy-button {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      transition: transform 0.18s ease, filter 0.18s ease;
     }
-    #progressBar div {
-      height: 100%;
+
+    .actions button:hover,
+    .copy-button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .progress-card {
+      display: grid;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .progress-card .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-bar span {
+      display: block;
       width: 0%;
-      background-color: #4caf50;
-      transition: width 0.2s;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(59,130,246,0.95), rgba(34,197,94,0.95));
+      transition: width 0.22s ease;
+    }
+
+    .output-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .output-panel {
+      flex: 1;
+      background: rgba(15, 23, 38, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 22px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .output-panel textarea {
+      flex: 1;
+      width: 100%;
+      min-height: 320px;
+      resize: vertical;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #a5f3fc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .output-panel textarea::selection {
+      background: rgba(59, 130, 246, 0.28);
+    }
+
+    .output-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .copy-button {
+      min-width: 160px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 18px;
+      min-height: 98px;
+    }
+
+    .stat-card span {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-size: 0.92rem;
+    }
+
+    .stat-card strong {
+      display: block;
+      font-size: 1.2rem;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    @media (max-width: 960px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
-  <h2>Convert File to Base64 (with Web Worker)</h2>
+  <div class="app-shell">
+    <section class="hero">
+      <div>
+        <h1>Base64 Converter</h1>
+        <p>Drag and drop any file to convert it to Base64 instantly. The worker handles large files while the UI stays responsive.</p>
+      </div>
+    </section>
 
-  <div class="drop-zone" id="dropZone">Drag & drop a file here or use the input below</div>
+    <div class="cards">
+      <article class="card">
+        <div class="card-title">
+          <div>
+            <h2>File to Base64</h2>
+            <div class="subtitle">Drop a file or browse to select one</div>
+          </div>
+        </div>
 
-  <div class="top-controls">
-    <input type="file" id="fileInput" />
-    <button id="convertBtn">Convert</button>
-  </div>
+        <div class="file-panel">
+          <div class="drop-zone" id="dropZone">
+            <strong>Drag and drop your file here</strong>
+            <span>or click to browse</span>
+          </div>
 
-  <div id="progressBar"><div></div></div>
+          <div class="file-meta" id="fileInfo">
+            <div>
+              <span>Selected file</span>
+              <strong id="fileName">No file selected</strong>
+            </div>
+            <div>
+              <span>Size</span>
+              <strong id="fileSize">—</strong>
+            </div>
+          </div>
 
-  <div class="controls">
-    <textarea id="output" placeholder="Base64 output will appear here..." readonly></textarea>
-    <button id="copyBtn">Copy</button>
+          <div class="actions">
+            <input type="file" id="fileInput" />
+            <button id="convertBtn">Convert</button>
+          </div>
+
+          <div class="progress-card">
+            <div class="label-row">
+              <span id="progressLabel">Ready to convert</span>
+              <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar"><span id="progressBar"></span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-title">
+          <div>
+            <h2>Base64 Output</h2>
+            <div class="subtitle">Copy or review the encoded string</div>
+          </div>
+        </div>
+
+        <div class="output-area">
+          <div class="output-panel">
+            <textarea id="output" placeholder="Base64 output will appear here..." readonly></textarea>
+          </div>
+
+          <div class="output-footer">
+            <button class="copy-button" id="copyBtn">Copy to clipboard</button>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="summary">
+      <div class="stat-card">
+        <span>File size</span>
+        <strong id="summaryFileSize">—</strong>
+      </div>
+      <div class="stat-card">
+        <span>Base64 size</span>
+        <strong id="summaryBase64Size">—</strong>
+      </div>
+      <div class="stat-card">
+        <span>Encoding</span>
+        <strong>Base64</strong>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -75,42 +400,85 @@
     const output = document.getElementById('output');
     const copyBtn = document.getElementById('copyBtn');
     const dropZone = document.getElementById('dropZone');
-    const progressBar = document.getElementById('progressBar').firstElementChild;
+    const progressBar = document.getElementById('progressBar');
+    const progressLabel = document.getElementById('progressLabel');
+    const progressPercent = document.getElementById('progressPercent');
+    const fileNameLabel = document.getElementById('fileName');
+    const fileSizeLabel = document.getElementById('fileSize');
+    const summaryFileSize = document.getElementById('summaryFileSize');
+    const summaryBase64Size = document.getElementById('summaryBase64Size');
 
     const worker = new Worker('worker.js');
 
-    worker.onmessage = (e) => {
-      const { type, data } = e.data;
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.floor(Math.log(bytes) / Math.log(1024));
+      return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
+    }
+
+    function updateFileInfo(file) {
+      fileNameLabel.textContent = file.name;
+      fileSizeLabel.textContent = formatBytes(file.size);
+      summaryFileSize.textContent = formatBytes(file.size);
+      summaryBase64Size.textContent = 'Pending...';
+      progressLabel.textContent = 'Ready to convert';
+      progressPercent.textContent = '0%';
+      progressBar.style.width = '0%';
+      output.value = '';
+    }
+
+    worker.onmessage = (event) => {
+      const { type, data } = event.data;
       if (type === 'progress') {
         progressBar.style.width = data + '%';
+        progressPercent.textContent = `${data}%`;
+        progressLabel.textContent = 'Converting to Base64...';
       } else if (type === 'result') {
         output.value = data;
         progressBar.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressLabel.textContent = 'Conversion complete';
+        summaryBase64Size.textContent = formatBytes(Math.ceil((data.length * 3) / 4));
       } else if (type === 'error') {
+        progressLabel.textContent = 'Conversion failed';
+        progressBar.style.width = '0%';
         alert('Error: ' + data);
       }
     };
 
+    function setFile(file) {
+      currentFile = file;
+      updateFileInfo(file);
+    }
+
+    async function copyOutput() {
+      if (!output.value) return;
+      await navigator.clipboard.writeText(output.value);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy to clipboard';
+      }, 1800);
+    }
+
     convertBtn.addEventListener('click', () => {
       if (!currentFile) {
-        alert("Please select or drop a file first.");
+        alert('Please select or drop a file first.');
         return;
       }
-
       progressBar.style.width = '0%';
+      progressPercent.textContent = '0%';
+      progressLabel.textContent = 'Starting conversion...';
       output.value = '';
       worker.postMessage({ file: currentFile });
     });
 
-    copyBtn.addEventListener('click', () => {
-      output.select();
-      document.execCommand('copy');
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => (copyBtn.textContent = 'Copy'), 2000);
-    });
+    copyBtn.addEventListener('click', copyOutput);
 
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (event) => {
+      event.preventDefault();
       dropZone.classList.add('dragover');
     });
 
@@ -118,20 +486,18 @@
       dropZone.classList.remove('dragover');
     });
 
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
+    dropZone.addEventListener('drop', (event) => {
+      event.preventDefault();
       dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files.length > 0) {
-        currentFile = e.dataTransfer.files[0];
-        fileInput.value = '';
-        dropZone.textContent = `File ready: ${currentFile.name}`;
+      const files = event.dataTransfer.files;
+      if (files.length > 0) {
+        setFile(files[0]);
       }
     });
 
     fileInput.addEventListener('change', () => {
       if (fileInput.files.length > 0) {
-        currentFile = fileInput.files[0];
-        dropZone.textContent = `File ready: ${currentFile.name}`;
+        setFile(fileInput.files[0]);
       }
     });
   </script>
